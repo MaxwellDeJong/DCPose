@@ -1,3 +1,7 @@
 /demo/input/
 /demo/output/
+/thirdparty/deform_conv/build/
 .idea
+*.so
+*.egg-info
+__pycache__/

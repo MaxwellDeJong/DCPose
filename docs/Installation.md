@@ -13,7 +13,7 @@ For our experiments, we used 2 NVIDIA 2080Ti GPUs.
 
 ```
 conda create -n DCPose python=3.6.12
-source activate DCPose
+conda activate DCPose
 ```
 
 
@@ -35,7 +35,7 @@ python setup.py develop
 
 
 
-4.Download our [pretrained models and supplementary](https://drive.google.com/drive/folders/1VPcwo9jVhnJpf5GVwR2-za1PFE6bCOXE?usp=sharing) .Put it in the directory `${DCPose_SUPP_DIR}`. (Note that part of the pre-trained models are available, and more pre-train models will be released soon later.)
+4.Download our [pretrained models and supplementary](https://drive.google.com/drive/folders/1VPcwo9jVhnJpf5GVwR2-za1PFE6bCOXE?usp=sharing) .Put it in the directory `DcPose_supp_files/`. (Note that part of the pre-trained models are available, and more pre-train models will be released soon later.)
  
 
 ### Data preparation
