@@ -67,7 +67,8 @@ def add_bbox_in_image(image, bbox):
   :param bbox   -  xyxy
   """
 
-  color = (random() * 255, random() * 255, random() * 255)
+  #color = (random() * 255, random() * 255, random() * 255)
+  color = (255, 255, 255)
 
   x1, y1, x2, y2 = map(int, bbox)
   image_with_bbox = cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness=6)
