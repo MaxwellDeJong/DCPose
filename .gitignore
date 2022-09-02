@@ -5,3 +5,4 @@
 *.so
 *.egg-info
 __pycache__/
+DcPose_supp_files/
