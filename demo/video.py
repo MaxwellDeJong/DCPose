@@ -1,140 +1,262 @@
 #!/usr/bin/python
 # -*- coding:utf8 -*-
 import os
-import os.path as osp
 import sys
 
-sys.path.insert(0, osp.abspath('../'))
+sys.path.insert(0, os.path.abspath('../'))
 
-from tqdm import tqdm
+from PIL import Image
+import copy
+import cv2
 import logging
+import json
+import numpy as np
+from typing import List, Optional
 
 from datasets.process.keypoints_ord import coco2posetrack_ord_infer
-from tools.inference import inference_PE
-from object_detector.YOLOv3.detector_yolov3 import inference_yolov3
-from utils.utils_folder import list_immediate_childfile_paths, create_folder
-from utils.utils_video import video2images, image2video
-from utils.utils_image import read_image, save_image
-from utils.utils_json import write_json_to_file
 from engine.core.vis_helper import add_poseTrack_joint_connection_to_image, add_bbox_in_image
+from tools.inference import inference_PE
+from object_detector.YOLOv3.detector_yolov3 import inference_yolov3_from_img
 
-zero_fill = 8
-
+_ZERO_FILL = 8
 logger = logging.getLogger(__name__)
 
+class Video:
+  """Class representing a video for pose estimation."""
 
-def main():
-    video()
+  def __init__(self, video_path: str, output_dir: str, frame_dir: Optional[str]=None):
+    self._path = video_path
+    self._output_dir = output_dir
+    if frame_dir:
+      self._frame_dir = frame_dir
+    else:
+      self._frame_dir = os.path.join(os.path.dirname(self._path), 'frames')
+    self._frames: List[VideoFrame] = []
+    self._done_split = False
+    self._done_detect = False
+    self._done_pose_estimation = False
+
+  @property
+  def basename(self):
+    """Return base name of video filename."""
+    full_video_name = os.path.basename(self._path)
+    # Remove extension
+    return full_video_name.split(".")[0]
+
+  @property
+  def length(self):
+    """Return number of frames in the video."""
+    return len(self._frames)
+
+  def split_to_frames(self):
+    """Split a video into individual frames that are saved."""
+    image_save_path = os.path.join(self._frame_dir, self.basename)
+    cap = cv2.VideoCapture(self._path)
+    isOpened: bool = cap.isOpened()
+    video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if not os.path.exists(image_save_path):
+      os.makedirs(image_save_path)
+    assert isOpened, "Can't find video"
+    for index in range(video_length):
+      (flag, frame_data) = cap.read()
+      frame_name = "{}.jpg".format(str(index).zfill(_ZERO_FILL))
+      frame_path = os.path.join(image_save_path, frame_name)
+      if flag:
+        cv2.imwrite(frame_path, frame_data, [cv2.IMWRITE_JPEG_QUALITY, 100])
+        self._frames.append(VideoFrame(frame_path))
+    self._done_split = True
+
+  def detect_person(self):
+    """Detect person across the video frames."""
+    assert self._done_split
+    for frame in self._frames:
+      frame.detect_person()
+    self._done_detect = True
+
+  def estimate_pose(self):
+    """Estimate person pose across the video frames."""
+    assert self._done_detect
+    for idx, frame in enumerate(self._frames):
+      prev_idx = max(idx - 1, 0)
+      prev_frame = self._frames[prev_idx]
+      next_idx = min(idx + 1, self.length - 1)
+      next_frame = self._frames[next_idx]
+      for bbox in frame.bboxes:
+        raw_keypoints = inference_PE(frame.path, prev_frame.path, next_frame.path, bbox)
+        frame._keypoints.append(raw_keypoints)
+    self._done_pose_estimation = True
+
+  def export_frame_detections(self):
+    """Save all frames with the person detection overlayed."""
+    detection_dir = os.path.join(self._output_dir, 'detections/')
+    for frame in self._frames:
+      frame.detect_person()
+      frame.draw_detection()
+      frame.export_detection_frame(detection_dir)
+
+  def export_frame_pose_estimations(self):
+    """Save all frames with the pose estimation overlayed."""
+    pose_estimation_dir = os.path.join(self._output_dir, 'pose_estimation/')
+    for frame in self._frames:
+      frame.draw_pose_estimation()
+      frame.export_pose_estimation_frame(pose_estimation_dir)
+
+  def export_frame_json(self):
+    """Save metadata created during pose estimation."""
+    json_dir = os.path.join(self._output_dir, 'json/')
+    for frame in self._frames:
+      frame.export_json(json_dir)
+
+  def _export_video(
+      self, images: List[np.ndarray], video_name: str, fps: int):
+    """Export a list of images as a video."""
+    #images = images.sort()
+    size = (images[0].shape[1], images[0].shape[0])
+    fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
+    video = cv2.VideoWriter(video_name, fourcc, fps, size)
+    for image in images:
+      video.write(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
+  def export_detection_video(self, fps: int=25):
+    """Export a video visualizing the person detection."""
+    detection_images = [frame.detection_image for frame in self._frames]
+    video_name = os.path.join(self._output_dir, self.basename + '_detection.mp4')
+    self._export_video(detection_images, video_name, fps=fps)
+
+  def export_pose_estimation_video(self, fps: int=25):
+    """Export a video visualizing the pose estimation."""
+    pose_estimation_images = [
+      frame.pose_estimation_image for frame in self._frames]
+    video_name = os.path.join(self._output_dir,
+                              self.basename + '_pose_estimation.mp4')
+    self._export_video(pose_estimation_images, video_name, fps=fps)
+
+  def perform_detection(self):
+    """Perform person detection and export resulting video."""
+    self.detect_person()
+    self.export_frame_detections()
+    self.export_detection_video()
+
+  def perform_pose_estimation(self):
+    """Perform pose estimation and export resulting video."""
+    self.estimate_pose()
+    self.export_frame_pose_estimations()
+    self.export_pose_estimation_video()
+
+  def infer_pose(self):
+    """Complete end-to-end pose estimation."""
+    self.split_to_frames()
+    self.perform_detection()
+    self.perform_pose_estimation()
+    self.export_frame_json()
 
 
-def video():
-    logger.info("Start")
-    base_video_path = "./input"
-    base_img_vis_save_dirs = './output/vis_img'
-    json_save_base_dirs = './output/json'
-    create_folder(json_save_base_dirs)
-    video_list = list_immediate_childfile_paths(base_video_path, ext=['mp3', 'mp4'])
-    input_image_save_dirs = []
-    SAVE_JSON = True
-    SAVE_VIS_VIDEO = True
-    SAVE_VIS_IMAGE = True
-    SAVE_BOX_IMAGE = True
-    base_img_vis_box_save_dirs = './output/vis_img_box'
-    # 1.Split the video into images
+class VideoFrame:
+  """Class to represent a single frame of a video."""
 
-    for video_path in tqdm(video_list):
-        video_name = osp.basename(video_path)
-        temp = video_name.split(".")[0]
-        image_save_path = os.path.join(base_video_path, temp)
-        image_vis_save_path = os.path.join(base_img_vis_save_dirs, temp)
-        image_vis_box_save_path = os.path.join(base_img_vis_box_save_dirs, temp)
-        input_image_save_dirs.append(image_save_path)
+  def __init__(self, image_path: str):
+    self._path = image_path
+    self._image: np.ndarray = np.asarray(Image.open(self._path))
+    self._detection_image: Optional[np.ndarray] = None
+    self._pose_estimation_image: Optional[np.ndarray] = None
+    self._bboxes: List = []
+    self._keypoints: List = []
 
-        create_folder(image_save_path)
-        create_folder(image_vis_save_path)
-        create_folder(image_vis_box_save_path)
+  @property
+  def path(self) -> str:
+    """Path to the saved image."""
+    return self._path
 
-        video2images(video_path, image_save_path)  # jpg
+  @property
+  def basename(self):
+    """Return base name of frame filename."""
+    full_frame_name = os.path.basename(self._path)
+    # Remove extension
+    return full_frame_name.split(".")[0]
 
-    # 2. Person Instance detection
-    logger.info("Person Instance detection in progress ...")
-    video_candidates = {}
-    for index, images_dir in tqdm(enumerate(input_image_save_dirs)):
-        # if index >= 1:
-        #     continue
-        video_name = osp.basename(images_dir)
-        image_list = list_immediate_childfile_paths(images_dir, ext='jpg')
-        video_candidates_list = []
-        for image_path in tqdm(image_list):
-            candidate_bbox = inference_yolov3(image_path)
-            for bbox in candidate_bbox:
-                # bbox  - x, y, w, h
-                video_candidates_list.append({"image_path": image_path,
-                                              "bbox": bbox,
-                                              "keypoints": None})
-        video_candidates[video_name] = {"candidates_list": video_candidates_list,
-                                        "length": len(image_list)}
-    logger.info("Person Instance detection finish")
-    # 3. Singe Person Pose Estimation
-    logger.info("Single person pose estimation in progress ...")
-    for video_name, video_info in video_candidates.items():
-        video_candidates_list = video_info["candidates_list"]
-        video_length = video_info["length"]
-        prev_image_id = None
-        for person_info in tqdm(video_candidates_list):
-            image_path = person_info["image_path"]
-            xywh_box = person_info["bbox"]
-            print(os.path.basename(image_path))
-            image_idx = int(os.path.basename(image_path).replace(".jpg", ""))
-            # from
-            prev_idx, next_id = image_idx - 1, image_idx + 1
-            if prev_idx < 0:
-                prev_idx = 0
-            if image_idx >= video_length - 1:
-                next_id = video_length - 1
-            prev_image_path = os.path.join(os.path.dirname(image_path), "{}.jpg".format(str(prev_idx).zfill(zero_fill)))
-            next_image_path = os.path.join(os.path.dirname(image_path), "{}.jpg".format(str(next_id).zfill(zero_fill)))
+  @property
+  def bboxes(self) -> List:
+    """Bounding boxes associated with frame."""
+    return self._bboxes
 
-            # current_image = read_image(image_path)
-            # prev_image = read_image(prev_image_path)
-            # next_image = read_image(next_image_path)
+  @property
+  def keypoints(self) -> List:
+    """Keypoints associated with frame."""
+    return self._keypoints
 
-            bbox = xywh_box
-            keypoints = inference_PE(image_path, prev_image_path, next_image_path, bbox)
-            person_info["keypoints"] = keypoints.tolist()[0]
+  @property
+  def image(self) -> np.ndarray:
+    """Image data as numpy array."""
+    return self._image
 
-            # posetrack points
-            new_coord = coco2posetrack_ord_infer(keypoints[0])
-            # pose
-            if SAVE_VIS_IMAGE:
-                image_save_path = os.path.join(os.path.join(base_img_vis_save_dirs, video_name), image_path.split("/")[-1])
-                if osp.exists(image_save_path):
-                    current_image = read_image(image_save_path)
-                else:
-                    current_image = read_image(image_path)
-                pose_img = add_poseTrack_joint_connection_to_image(current_image, new_coord, sure_threshold=0.3, flag_only_draw_sure=True)
-                save_image(image_save_path, pose_img)
+  @property
+  def detection_image(self) -> np.ndarray:
+    """Image data with detection overlayed."""
+    return self._detection_image
 
-            if SAVE_BOX_IMAGE:
-                image_save_path = os.path.join(os.path.join(base_img_vis_box_save_dirs, video_name), image_path.split("/")[-1])
-                if osp.exists(image_save_path):
-                    current_image = read_image(image_save_path)
-                else:
-                    current_image = read_image(image_path)
-                xyxy_box = bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]
-                box_image = add_bbox_in_image(current_image, xyxy_box)
-                save_image(image_save_path, box_image)
+  @property
+  def pose_estimation_image(self) -> np.ndarray:
+    """Image data with pose estimation overlayed."""
+    return self._pose_estimation_image
 
-        if SAVE_JSON:
-            joints_info = {"Info": video_candidates_list}
-            temp = "result_" + video_name + ".json"
-            write_json_to_file(joints_info, os.path.join(json_save_base_dirs, temp))
-            print("------->json Info save Complete!")
-            print("------->Visual Video Compose Start")
-        if SAVE_VIS_VIDEO:
-            image2video(os.path.join(base_img_vis_save_dirs, video_name), video_name)
-            print("------->Complete!")
+  def detect_person(self):
+    """Perform person detection on frame."""
+    self._bboxes = inference_yolov3_from_img(self.image)
+
+  def draw_detection(self):
+    """Draw the result of performing person detection."""
+    self._detection_image = copy.deepcopy(self.image)
+    for bbox in self.bboxes:
+      xyxy_box = bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]
+      self._detection_image = add_bbox_in_image(self.detection_image, xyxy_box)
+
+  def draw_pose_estimation(self):
+    """Draw the result of performing pose estimation."""
+    self._pose_estimation_image = copy.deepcopy(self.image)
+    for keypoints in self.keypoints:
+      new_coord = coco2posetrack_ord_infer(keypoints[0])
+      self._pose_estimation_image = add_poseTrack_joint_connection_to_image(
+        self._pose_estimation_image,
+        new_coord,
+        sure_threshold=0.3,
+        flag_only_draw_sure=True)
+
+  def export_pose_estimation_frame(self, pose_estimation_output_dir: str):
+    """Export an image with the pose estimation visualized."""
+    if not os.path.exists(pose_estimation_output_dir):
+      os.makedirs(pose_estimation_output_dir)
+    pose_estimation_frame_fname = os.path.join(pose_estimation_output_dir,
+                                               self.basename + '.jpg')
+    cv2.imwrite(pose_estimation_frame_fname,
+                cv2.cvtColor(self._pose_estimation_image, cv2.COLOR_RGB2BGR),
+                [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+  def export_detection_frame(self, detection_output_dir: str):
+    """Export an image with the person detection visualized."""
+    if not os.path.exists(detection_output_dir):
+      os.makedirs(detection_output_dir)
+    detection_frame_fname = os.path.join(
+      detection_output_dir, self.basename + '.jpg')
+    cv2.imwrite(detection_frame_fname,
+                cv2.cvtColor(self._detection_image, cv2.COLOR_RGB2BGR),
+                [cv2.IMWRITE_JPEG_QUALITY, 100])
+
+  def export_json(self, json_output_dir: str):
+    """Export JSON data containing bounding boxes and keypoints."""
+    if not os.path.exists(json_output_dir):
+      os.makedirs(json_output_dir)
+    joints_info = {'frame_name': self.path,
+                   'frame_bboxes': self.bboxes,
+                   'frame_keypoints': 
+                     [keypoints.tolist()[0] for keypoints in self.keypoints]}
+    json_frame_fname = os.path.join(json_output_dir, self.basename + '.json')
+    with open(json_frame_fname, 'w') as json_file:
+      json.dump(joints_info, json_file)
 
 
 if __name__ == '__main__':
-    main()
+  video_path = './input/test_2p.mp4'
+  output_dir = './outputs_2p/'
+  frame_dir = None
+  v = Video(video_path, output_dir)
+  v.infer_pose()
