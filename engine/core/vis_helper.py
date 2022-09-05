@@ -99,7 +99,7 @@ def add_poseTrack_joint_connection_to_image(img_demo, joints, sure_threshold=0.8
 
 def circle_vis_point(img, joints):
   for joint in joints:
-    x, y, c = [int(i) for i in joint]
+    x, y, _ = [int(i) for i in joint]
     cv2.circle(img, (x, y), 3, (255, 255, 255), thickness=3)
 
   return img

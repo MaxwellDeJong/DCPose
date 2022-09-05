@@ -2,9 +2,9 @@
 # -*- coding:utf8 -*-
 
 __all__ = ["PoseTrack_Official_Keypoint_Ordering",
-       "PoseTrack_Keypoint_Pairs",
-       "PoseTrack_Keypoint_Name_Colors",
-       "PoseTrack_COCO_Keypoint_Ordering"]
+           "PoseTrack_Keypoint_Pairs",
+           "PoseTrack_Keypoint_Name_Colors",
+           "PoseTrack_COCO_Keypoint_Ordering"]
 
 #  PoseTrack Official Keypoint Ordering  - A total of 15
 PoseTrack_Official_Keypoint_Ordering = [
@@ -64,17 +64,17 @@ PoseTrack_COCO_Keypoint_Ordering = [
 ]
 
 PoseTrack_Keypoint_Name_Colors = [['right_ankle', 'Gold'],
-                  ['right_knee', 'Orange'],
-                  ['right_hip', 'DarkOrange'],
-                  ['left_hip', 'Peru'],
-                  ['left_knee', 'LightSalmon'],
-                  ['left_ankle', 'OrangeRed'],
-                  ['right_wrist', 'LightGreen'],
-                  ['right_elbow', 'LimeGreen'],
-                  ['right_shoulder', 'ForestGreen'],
-                  ['left_shoulder', 'DarkTurquoise'],
-                  ['left_elbow', 'Cyan'],
-                  ['left_wrist', 'PaleTurquoise'],
-                  ['head_bottom', 'DoderBlue'],
-                  ['nose', 'HotPink'],
-                  ['head_top', 'SlateBlue']]
+                                  ['right_knee', 'Orange'],
+                                  ['right_hip', 'DarkOrange'],
+                                  ['left_hip', 'Peru'],
+                                  ['left_knee', 'LightSalmon'],
+                                  ['left_ankle', 'OrangeRed'],
+                                  ['right_wrist', 'LightGreen'],
+                                  ['right_elbow', 'LimeGreen'],
+                                  ['right_shoulder', 'ForestGreen'],
+                                  ['left_shoulder', 'DarkTurquoise'],
+                                  ['left_elbow', 'Cyan'],
+                                  ['left_wrist', 'PaleTurquoise'],
+                                  ['head_bottom', 'DoderBlue'],
+                                  ['nose', 'HotPink'],
+                                  ['head_top', 'SlateBlue']]

@@ -11,23 +11,23 @@ from engine import default_parse_args, DefaultRunner
 
 
 def setup(args):
-    cfg = get_cfg(args)
-    update_config(cfg, args)
+  cfg = get_cfg(args)
+  update_config(cfg, args)
 
-    # cudnn related setting
-    cudnn.benchmark = cfg.CUDNN.BENCHMARK
-    cudnn.deterministic = cfg.CUDNN.DETERMINISTIC
-    cudnn.enabled = cfg.CUDNN.ENABLED
+  # cudnn related setting
+  cudnn.benchmark = cfg.CUDNN.BENCHMARK
+  cudnn.deterministic = cfg.CUDNN.DETERMINISTIC
+  cudnn.enabled = cfg.CUDNN.ENABLED
 
-    return cfg
+  return cfg
 
 
 def main():
-    args = default_parse_args()
-    cfg = setup(args)
-    runner = DefaultRunner(cfg, args)
-    runner.launch()
+  args = default_parse_args()
+  cfg = setup(args)
+  runner = DefaultRunner(cfg, args)
+  runner.launch()
 
 
 if __name__ == '__main__':
-    main()
+  main()
