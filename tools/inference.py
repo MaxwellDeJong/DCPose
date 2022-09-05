@@ -1,25 +1,22 @@
-#!/usr/bin/python
-# -*- coding:utf8 -*-
-
-import os
-import sys
 import argparse
 import cv2
-import numpy as np
-import torch
 import logging
+import numpy as np
+import os
+import torch
 
 from datasets.process import get_affine_transform
-from datasets.transforms import build_transforms
 from datasets.process import get_final_preds
-from posetimation.zoo import build_model
+from datasets.transforms import build_transforms
 from posetimation.config import get_cfg, update_config
+from posetimation.zoo import build_model
+from utils.common import INFERENCE_PHASE
 from utils.utils_bbox import box2cs
 from utils.utils_image import read_image, save_image
-from utils.common import INFERENCE_PHASE
 
-# Please make sure that root dir is the root directory of the project
-root_dir = os.path.abspath('../')
+
+_IMAGE_SIZE = np.array([288, 384])
+_ASPECT_RATIO = _IMAGE_SIZE[0] * 1.0 / _IMAGE_SIZE[1]
 
 
 def parse_args():
@@ -36,65 +33,62 @@ def parse_args():
 
   # philly
   args = parser.parse_args()
-  args.rootDir = root_dir
+  args.rootDir = os.path.abspath('../')
   args.cfg = os.path.abspath(os.path.join(args.rootDir, args.cfg))
   args.weight = os.path.abspath(os.path.join(args.rootDir, args.weight))
   return args
 
 
-cfg = None
-args = None
-
-
 def get_inference_model():
   logger = logging.getLogger(__name__)
-  global cfg, args
   args = parse_args()
   cfg = get_cfg(args)
   update_config(cfg, args)
   logger.info("load :{}".format(args.weight))
+
+  model = build_model(cfg, INFERENCE_PHASE)
+  if torch.cuda.is_available():
+    model = model.cuda()
+
   checkpoint_dict = torch.load(args.weight)
   model_state_dict = {k.replace('module.', ''): v for k, v in checkpoint_dict['state_dict'].items()}
-  new_model = build_model(cfg, INFERENCE_PHASE)
-  new_model.load_state_dict(model_state_dict)
-  return new_model
+  model.load_state_dict(model_state_dict)
+  return model
 
 
-model = get_inference_model()
-model = model.cuda()
-image_transforms = build_transforms(None, INFERENCE_PHASE)
-image_size = np.array([288, 384])
-aspect_ratio = image_size[0] * 1.0 / image_size[1]
+def get_inference_preprocessing_transforms():
+  return build_transforms(None, INFERENCE_PHASE)
 
 
-def image_preprocess(image_path: str, prev_image: str, next_image: str, center, scale):
-  trans_matrix = get_affine_transform(center, scale, 0, image_size)
+
+def image_preprocess(image_path: str, prev_image: str, next_image: str, center, scale, image_transforms):
+  trans_matrix = get_affine_transform(center, scale, 0, _IMAGE_SIZE)
   image_data = read_image(image_path)
-  image_data = cv2.warpAffine(image_data, trans_matrix, (int(image_size[0]), int(image_size[1])), flags=cv2.INTER_LINEAR)
+  image_data = cv2.warpAffine(image_data, trans_matrix, (int(_IMAGE_SIZE[0]), int(_IMAGE_SIZE[1])), flags=cv2.INTER_LINEAR)
   image_data = image_transforms(image_data)
   if prev_image is None or next_image is None:
     return image_data
   else:
     prev_image_data = read_image(prev_image)
-    prev_image_data = cv2.warpAffine(prev_image_data, trans_matrix, (int(image_size[0]), int(image_size[1])), flags=cv2.INTER_LINEAR)
+    prev_image_data = cv2.warpAffine(prev_image_data, trans_matrix, (int(_IMAGE_SIZE[0]), int(_IMAGE_SIZE[1])), flags=cv2.INTER_LINEAR)
     prev_image_data = image_transforms(prev_image_data)
 
     next_image_data = read_image(next_image)
-    next_image_data = cv2.warpAffine(next_image_data, trans_matrix, (int(image_size[0]), int(image_size[1])), flags=cv2.INTER_LINEAR)
+    next_image_data = cv2.warpAffine(next_image_data, trans_matrix, (int(_IMAGE_SIZE[0]), int(_IMAGE_SIZE[1])), flags=cv2.INTER_LINEAR)
     next_image_data = image_transforms(next_image_data)
 
     return image_data, prev_image_data, next_image_data
 
 
-def inference_PE(input_image: str, prev_image: str, next_image: str, bbox):
+def inference_PE(input_image: str, prev_image: str, next_image: str, bbox, image_transforms, model):
   """
     input_image : input image path
     prev_image : prev image path
     next_image : next image path
     inference pose estimation
   """
-  center, scale = box2cs(bbox, aspect_ratio)
-  target_image_data, prev_image_data, next_image_data = image_preprocess(input_image, prev_image, next_image, center, scale)
+  center, scale = box2cs(bbox, _ASPECT_RATIO)
+  target_image_data, prev_image_data, next_image_data = image_preprocess(input_image, prev_image, next_image, center, scale, image_transforms)
 
   target_image_data = target_image_data.unsqueeze(0)
   prev_image_data = prev_image_data.unsqueeze(0)
@@ -112,7 +106,7 @@ def inference_PE(input_image: str, prev_image: str, next_image: str, bbox):
   return pred_keypoints
 
 
-def inference_PE_batch(input_image_list: list, prev_image_list: list, next_image_list: list, bbox_list: list):
+def inference_PE_batch(input_image_list: list, prev_image_list: list, next_image_list: list, bbox_list: list, image_transforms, model):
   """
     input_image : input image path
     prev_image : prev image path
@@ -131,11 +125,11 @@ def inference_PE_batch(input_image_list: list, prev_image_list: list, next_image
     prev_image = prev_image_list[batch_index]
     next_image = next_image_list[batch_index]
 
-    center, scale = box2cs(bbox, aspect_ratio)
+    center, scale = box2cs(bbox, _ASPECT_RATIO)
     batch_center.append(center)
     batch_scale.append(scale)
 
-    target_image_data, prev_image_data, next_image_data = image_preprocess(input_image, prev_image, next_image, center, scale)
+    target_image_data, prev_image_data, next_image_data = image_preprocess(input_image, prev_image, next_image, center, scale, image_transforms)
 
     target_image_data = target_image_data.unsqueeze(0)
     prev_image_data = prev_image_data.unsqueeze(0)

@@ -3,7 +3,7 @@ from .detector_utils import *
 
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 import argparse
 
@@ -49,7 +49,6 @@ def load_eval_model():
     model.cuda()
   model.eval()  # Set in evaluation mode
   return model
-
 
 
 def inference_yolov3_from_img(img: np.ndarray, model: Darknet):

@@ -15,10 +15,13 @@ from typing import List, Optional
 
 from datasets.process.keypoints_ord import coco2posetrack_ord_infer
 from engine.core.vis_helper import add_poseTrack_joint_connection_to_image, add_bbox_in_image
-from tools.inference import inference_PE
 from object_detector.YOLOv3.detector_yolov3 import load_eval_model
 from object_detector.YOLOv3.detector_yolov3 import inference_yolov3_from_img
 from object_detector.YOLOv3.models import Darknet
+from tools.inference import get_inference_model
+from tools.inference import get_inference_preprocessing_transforms
+from tools.inference import inference_PE
+from utils.common import INFERENCE_PHASE
 
 
 _ZERO_FILL = 8
@@ -65,7 +68,7 @@ class Video:
         cv2.imwrite(frame_path, frame_data, [cv2.IMWRITE_JPEG_QUALITY, 100])
         self._frames.append(VideoFrame(frame_path))
 
-  def estimate_pose(self):
+  def estimate_pose(self, image_transforms, pose_estimation_model):
     """Estimate person pose across the video frames."""
     for idx, frame in enumerate(self._frames):
       prev_idx = max(idx - 1, 0)
@@ -73,7 +76,7 @@ class Video:
       next_idx = min(idx + 1, self.length - 1)
       next_frame = self._frames[next_idx]
       for bbox in frame.bboxes:
-        raw_keypoints = inference_PE(frame.path, prev_frame.path, next_frame.path, bbox)
+        raw_keypoints = inference_PE(frame.path, prev_frame.path, next_frame.path, bbox, image_transforms, pose_estimation_model)
         frame._keypoints.append(raw_keypoints)
     self._done_pose_estimation = True
 
@@ -126,17 +129,23 @@ class Video:
     self.export_frame_detections(detection_model)
     self.export_detection_video()
 
-  def perform_pose_estimation(self):
+  def perform_pose_estimation(
+      self, pose_estimation_preprocessing_transforms, pose_estimation_model):
     """Perform pose estimation and export resulting video."""
-    self.estimate_pose()
+    self.estimate_pose(
+      pose_estimation_preprocessing_transforms, pose_estimation_model)
     self.export_frame_pose_estimations()
     self.export_pose_estimation_video()
 
-  def infer_pose(self, detection_model: Darknet):
+  def infer_pose(self,
+                 detection_model: Darknet,
+                 pose_estimation_preprocessing_transforms,
+                 pose_estimation_model):
     """Complete end-to-end pose estimation."""
     self.split_to_frames()
     self.perform_detection(detection_model)
-    self.perform_pose_estimation()
+    self.perform_pose_estimation(
+      pose_estimation_preprocessing_transforms, pose_estimation_model)
     self.export_frame_json()
 
 
@@ -248,5 +257,12 @@ if __name__ == '__main__':
   output_dir = './outputs_2p/'
   frame_dir = None
   v = Video(video_path, output_dir)
+
   detection_model = load_eval_model()
-  v.infer_pose(detection_model)
+  pose_estimation_preprocessing_transforms = (
+    get_inference_preprocessing_transforms())
+  pose_estimation_model = get_inference_model()
+
+  v.infer_pose(detection_model,
+               pose_estimation_preprocessing_transforms,
+               pose_estimation_model)
