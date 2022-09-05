@@ -30,39 +30,32 @@ opt.config_path = os.path.join(tracking_network_path, opt.config_path)
 opt.weights_path = os.path.join(tracking_network_path, opt.weights_path)
 print("Detector YOLOv3 options:", opt)
 
-cuda = torch.cuda.is_available()
-
-# Set up model
-model = Darknet(opt.config_path, img_size=opt.img_size)
-
-if opt.weights_path.endswith(".weights"):
-  # Load darknet weights
-  model.load_darknet_weights(opt.weights_path)
-else:
-  # Load checkpoint weights
-  model.load_state_dict(torch.load(opt.weights_path))
-
-if cuda:
-  model.cuda()
-
-model.eval()  # Set in evaluation mode
-
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
-imgs = []  # Stores image paths
-img_detections = []  # Stores detections for each image index
+_Tensor_Type = (
+  torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor)
 
 
-def inference_yolov3(img_path):
-  img = np.array(Image.open(img_path))
-  return inference_yolov3_from_img(img)
+def load_eval_model():
+  """Load a yolov3 detector model for evaluation."""
+  cuda = torch.cuda.is_available()
+  # Set up model
+  model = Darknet(opt.config_path, img_size=opt.img_size)
+  if opt.weights_path.endswith(".weights"):
+    # Load darknet weights
+    model.load_darknet_weights(opt.weights_path)
+  else:
+    # Load checkpoint weights
+    model.load_state_dict(torch.load(opt.weights_path))
+  if cuda:
+    model.cuda()
+  model.eval()  # Set in evaluation mode
+  return model
 
 
-def inference_yolov3_from_img(img):
+
+def inference_yolov3_from_img(img: np.ndarray, model: Darknet):
   input_img = preprocess_img_for_yolo(img)
-
   # Configure input
-  input_img = Variable(input_img.type(Tensor))
+  input_img = Variable(input_img.type(_Tensor_Type))
 
   # Get detections
   with torch.no_grad():
@@ -98,5 +91,6 @@ def inference_yolov3_from_img(img):
 
 if __name__ == "__main__":
   img_path = "/export/guanghan/PyTorch-YOLOv3/data/samples/messi.jpg"
-  human_candidates = inference_yolov3(img_path)
+  img = np.array(Image.open(img_path))
+  human_candidates = inference_yolov3_from_img(img)
   print("human_candidates:", human_candidates)
