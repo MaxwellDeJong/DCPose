@@ -13,19 +13,41 @@ from PIL import Image
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config_path", type=str, default="object_detector/YOLOv3/config/yolov3.cfg", help="path to model config file")
-parser.add_argument("--weights_path", type=str, default="DcPose_supp_files/object_detector/YOLOv3/yolov3.weights",
+parser.add_argument("--config_path",
+                    type=str,
+                    default="object_detector/config/yolov3.cfg",
+                    help="path to model config file")
+parser.add_argument("--weights_path",
+                    type=str,
+                    default="DcPose_supp_files/object_detector/YOLOv3/yolov3.weights",
                     help="path to weights file")
-parser.add_argument("--conf_thres", type=float, default=0.4, help="object confidence threshold")
-parser.add_argument("--nms_thres", type=float, default=0.4, help="iou thresshold for non-maximum suppression")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
-parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
-parser.add_argument("--checkpoint_model", type=str, help="path to checkpoint model")
+parser.add_argument("--conf_thres",
+                    type=float,
+                    default=0.4,
+                    help="object confidence threshold")
+parser.add_argument("--nms_thres",
+                    type=float,
+                    default=0.4,
+                    help="iou threshold for non-maximum suppression")
+parser.add_argument("--batch_size",
+                    type=int,
+                    default=1,
+                    help="size of the batches")
+parser.add_argument("--n_cpu",
+                    type=int,
+                    default=8,
+                    help="number of cpu threads to use during batch generation")
+parser.add_argument("--img_size",
+                    type=int,
+                    default=416,
+                    help="size of each image dimension")
+parser.add_argument("--checkpoint_model",
+                    type=str,
+                    help="path to checkpoint model")
 opt = parser.parse_args()
 ###
 this_file_path = __file__
-tracking_network_path = os.path.dirname(os.path.dirname(os.path.dirname(this_file_path)))
+tracking_network_path = '/home/max/Desktop/pose_estimation/DCPose/'
 opt.config_path = os.path.join(tracking_network_path, opt.config_path)
 opt.weights_path = os.path.join(tracking_network_path, opt.weights_path)
 print("Detector YOLOv3 options:", opt)

@@ -15,9 +15,9 @@ from typing import List, Optional
 
 from datasets.process.keypoints_ord import coco2posetrack_ord_infer
 from engine.core.vis_helper import add_poseTrack_joint_connection_to_image, add_bbox_in_image
-from object_detector.YOLOv3.detector_yolov3 import load_eval_model
-from object_detector.YOLOv3.detector_yolov3 import inference_yolov3_from_img
-from object_detector.YOLOv3.models import Darknet
+from object_detector.detector_yolov3 import load_eval_model
+from object_detector.detector_yolov3 import inference_yolov3_from_img
+from object_detector.models import Darknet
 from tools.inference import get_inference_model
 from tools.inference import get_inference_preprocessing_transforms
 from tools.inference import inference_PE
