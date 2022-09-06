@@ -8,7 +8,7 @@ import torch.nn as nn
 from collections import OrderedDict
 
 from ..base import BaseModel
-from posetimation.layers import BasicBlock, Bottleneck
+from pose_estimation.layers import BasicBlock, Bottleneck
 from utils.common import TRAIN_PHASE
 from utils.utils_registry import MODEL_REGISTRY
 

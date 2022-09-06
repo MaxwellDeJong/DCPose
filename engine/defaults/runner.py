@@ -6,7 +6,7 @@ from .trainer import DefaultTrainer
 from .evaluator import DefaultEvaluator
 from utils.utils_folder import create_folder
 from engine.defaults import TRAIN_PHASE, VAL_PHASE, TEST_PHASE
-from posetimation.zoo import get_model_hyperparameter
+from pose_estimation.zoo import get_model_hyperparameter
 from datasets import get_dataset_name
 from collections import defaultdict
 

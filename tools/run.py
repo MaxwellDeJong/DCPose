@@ -6,7 +6,7 @@ import sys
 import torch.backends.cudnn as cudnn
 
 sys.path.insert(0, os.path.abspath('../'))
-from posetimation import get_cfg, update_config
+from pose_estimation import get_cfg, update_config
 from engine import default_parse_args, DefaultRunner
 
 

@@ -11,8 +11,8 @@ from collections import OrderedDict
 from ..base import BaseModel
 
 from thirdparty.deform_conv import DeformConv, ModulatedDeformConv
-from posetimation.layers import BasicBlock, ChainOfBasicBlocks, DeformableCONV, PAM_Module, CAM_Module
-from posetimation.layers import RSB_BLOCK, CHAIN_RSB_BLOCKS
+from pose_estimation.layers import BasicBlock, ChainOfBasicBlocks, DeformableCONV, PAM_Module, CAM_Module
+from pose_estimation.layers import RSB_BLOCK, CHAIN_RSB_BLOCKS
 from ..backbones.hrnet import HRNet
 from utils.common import TRAIN_PHASE
 from utils.utils_registry import MODEL_REGISTRY

@@ -8,9 +8,9 @@ from tensorboardX import SummaryWriter
 from .base import BaseExecutor
 from .checkpoints import get_latest_checkpoint, save_checkpoint, resume
 from datasets import build_train_loader
-from posetimation.zoo import build_model
-from posetimation.optimizer import build_lr_scheduler, build_optimizer
-from posetimation.loss import build_loss
+from pose_estimation.zoo import build_model
+from pose_estimation.optimizer import build_lr_scheduler, build_optimizer
+from pose_estimation.loss import build_loss
 from engine.core import build_core_function
 from engine.defaults import TRAIN_PHASE
 from engine.apis import set_random_seed

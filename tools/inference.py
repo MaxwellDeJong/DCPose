@@ -8,8 +8,8 @@ import torch
 from datasets.process import get_affine_transform
 from datasets.process import get_final_preds
 from datasets.transforms import build_transforms
-from posetimation.config import get_cfg, update_config
-from posetimation.zoo import build_model
+from pose_estimation.config import get_cfg, update_config
+from pose_estimation.zoo import build_model
 from utils.common import INFERENCE_PHASE
 from utils.utils_bbox import box2cs
 from utils.utils_image import read_image, save_image

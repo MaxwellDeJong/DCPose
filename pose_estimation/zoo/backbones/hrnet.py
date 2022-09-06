@@ -3,7 +3,7 @@
 
 import torch
 import torch.nn as nn
-from posetimation.layers import Interpolate, BasicBlock, Bottleneck
+from pose_estimation.layers import Interpolate, BasicBlock, Bottleneck
 import logging
 import os.path as osp
 
