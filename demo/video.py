@@ -15,8 +15,14 @@ from typing import List, Optional
 
 from datasets.process.keypoints_ord import coco2posetrack_ord_infer
 from engine.core.vis_helper import add_poseTrack_joint_connection_to_image, add_bbox_in_image
-from tools.inference import inference_PE
+from object_detector.YOLOv3.detector_yolov3 import load_eval_model
 from object_detector.YOLOv3.detector_yolov3 import inference_yolov3_from_img
+from object_detector.YOLOv3.models import Darknet
+from tools.inference import get_inference_model
+from tools.inference import get_inference_preprocessing_transforms
+from tools.inference import inference_PE
+from utils.common import INFERENCE_PHASE
+
 
 _ZERO_FILL = 8
 logger = logging.getLogger(__name__)
@@ -32,9 +38,6 @@ class Video:
     else:
       self._frame_dir = os.path.join(os.path.dirname(self._path), 'frames')
     self._frames: List[VideoFrame] = []
-    self._done_split = False
-    self._done_detect = False
-    self._done_pose_estimation = False
 
   @property
   def basename(self):
@@ -64,33 +67,24 @@ class Video:
       if flag:
         cv2.imwrite(frame_path, frame_data, [cv2.IMWRITE_JPEG_QUALITY, 100])
         self._frames.append(VideoFrame(frame_path))
-    self._done_split = True
 
-  def detect_person(self):
-    """Detect person across the video frames."""
-    assert self._done_split
-    for frame in self._frames:
-      frame.detect_person()
-    self._done_detect = True
-
-  def estimate_pose(self):
+  def estimate_pose(self, image_transforms, pose_estimation_model):
     """Estimate person pose across the video frames."""
-    assert self._done_detect
     for idx, frame in enumerate(self._frames):
       prev_idx = max(idx - 1, 0)
       prev_frame = self._frames[prev_idx]
       next_idx = min(idx + 1, self.length - 1)
       next_frame = self._frames[next_idx]
       for bbox in frame.bboxes:
-        raw_keypoints = inference_PE(frame.path, prev_frame.path, next_frame.path, bbox)
+        raw_keypoints = inference_PE(frame.path, prev_frame.path, next_frame.path, bbox, image_transforms, pose_estimation_model)
         frame._keypoints.append(raw_keypoints)
     self._done_pose_estimation = True
 
-  def export_frame_detections(self):
+  def export_frame_detections(self, detection_model: Darknet):
     """Save all frames with the person detection overlayed."""
     detection_dir = os.path.join(self._output_dir, 'detections/')
     for frame in self._frames:
-      frame.detect_person()
+      frame.detect_person(detection_model)
       frame.draw_detection()
       frame.export_detection_frame(detection_dir)
 
@@ -110,7 +104,6 @@ class Video:
   def _export_video(
       self, images: List[np.ndarray], video_name: str, fps: int):
     """Export a list of images as a video."""
-    #images = images.sort()
     size = (images[0].shape[1], images[0].shape[0])
     fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
     video = cv2.VideoWriter(video_name, fourcc, fps, size)
@@ -131,23 +124,28 @@ class Video:
                               self.basename + '_pose_estimation.mp4')
     self._export_video(pose_estimation_images, video_name, fps=fps)
 
-  def perform_detection(self):
+  def perform_detection(self, detection_model: Darknet):
     """Perform person detection and export resulting video."""
-    self.detect_person()
-    self.export_frame_detections()
+    self.export_frame_detections(detection_model)
     self.export_detection_video()
 
-  def perform_pose_estimation(self):
+  def perform_pose_estimation(
+      self, pose_estimation_preprocessing_transforms, pose_estimation_model):
     """Perform pose estimation and export resulting video."""
-    self.estimate_pose()
+    self.estimate_pose(
+      pose_estimation_preprocessing_transforms, pose_estimation_model)
     self.export_frame_pose_estimations()
     self.export_pose_estimation_video()
 
-  def infer_pose(self):
+  def infer_pose(self,
+                 detection_model: Darknet,
+                 pose_estimation_preprocessing_transforms,
+                 pose_estimation_model):
     """Complete end-to-end pose estimation."""
     self.split_to_frames()
-    self.perform_detection()
-    self.perform_pose_estimation()
+    self.perform_detection(detection_model)
+    self.perform_pose_estimation(
+      pose_estimation_preprocessing_transforms, pose_estimation_model)
     self.export_frame_json()
 
 
@@ -199,9 +197,9 @@ class VideoFrame:
     """Image data with pose estimation overlayed."""
     return self._pose_estimation_image
 
-  def detect_person(self):
+  def detect_person(self, model: Darknet):
     """Perform person detection on frame."""
-    self._bboxes = inference_yolov3_from_img(self.image)
+    self._bboxes = inference_yolov3_from_img(self.image, model)
 
   def draw_detection(self):
     """Draw the result of performing person detection."""
@@ -259,4 +257,12 @@ if __name__ == '__main__':
   output_dir = './outputs_2p/'
   frame_dir = None
   v = Video(video_path, output_dir)
-  v.infer_pose()
+
+  detection_model = load_eval_model()
+  pose_estimation_preprocessing_transforms = (
+    get_inference_preprocessing_transforms())
+  pose_estimation_model = get_inference_model()
+
+  v.infer_pose(detection_model,
+               pose_estimation_preprocessing_transforms,
+               pose_estimation_model)

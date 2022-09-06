@@ -8,7 +8,7 @@ import logging
 from torchvision.utils import make_grid
 
 from tensorboardX import SummaryWriter
-from .evaludate import accuracy, pck_accuracy, pck_accuracy_origin_image
+from .evaluate import accuracy, pck_accuracy, pck_accuracy_origin_image
 from engine.core import CORE_FUNCTION_REGISTRY, BaseFunction, AverageMeter
 
 # from engine.evaludate import accuracy
