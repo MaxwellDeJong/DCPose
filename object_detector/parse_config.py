@@ -1,8 +1,5 @@
-
-
-
 def parse_model_config(path):
-  """Parses the yolo-v3 layer configuration file and returns module definitions"""
+  """Parse the yolo-v3 layer configuration file and return module definitions"""
   file = open(path, 'r')
   lines = file.read().split('\n')
   lines = [x for x in lines if x and not x.startswith('#')]
@@ -23,7 +20,7 @@ def parse_model_config(path):
 
 
 def parse_data_config(path):
-  """Parses the data configuration file"""
+  """Parse the data configuration file."""
   options = dict()
   options['gpus'] = '0,1,2,3'
   options['num_workers'] = '10'
