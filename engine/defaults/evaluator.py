@@ -8,7 +8,7 @@ from tensorboardX import SummaryWriter
 
 from .base import BaseExecutor
 from datasets import build_eval_loader
-from posetimation.zoo import build_model
+from pose_estimation.zoo import build_model
 from .checkpoints import get_all_checkpoints, get_latest_checkpoint
 from engine.core import build_core_function
 from engine.defaults import VAL_PHASE, TEST_PHASE
