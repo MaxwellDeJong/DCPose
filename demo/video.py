@@ -80,12 +80,24 @@ class Video:
         frame._keypoints.append(raw_keypoints)
     self._done_pose_estimation = True
 
-  def export_frame_detections(self, detection_model: Darknet):
+  def export_frame_detections(
+      self, detection_model: Darknet, apply_backfill: bool=True):
     """Save all frames with the person detection overlayed."""
     detection_dir = os.path.join(self._output_dir, 'detections/')
+    prev_bbox = []
+    backfilled = False
     for frame in self._frames:
       frame.detect_person(detection_model)
-      frame.draw_detection()
+      if apply_backfill:
+        if not frame._bboxes:
+          frame._bboxes = prev_bbox
+          backfilled = True
+          logging.info(
+            'No detection found in frame. Applying detection backfill.')
+        else:
+          prev_bbox = frame._bboxes
+          backfilled = False
+      frame.draw_detection(backfilled_detection=backfilled)
       frame.export_detection_frame(detection_dir)
 
   def export_frame_pose_estimations(self):
@@ -201,12 +213,17 @@ class VideoFrame:
     """Perform person detection on frame."""
     self._bboxes = inference_yolov3_from_img(self.image, model)
 
-  def draw_detection(self):
+  def draw_detection(self, backfilled_detection: bool=False):
     """Draw the result of performing person detection."""
     self._detection_image = copy.deepcopy(self.image)
+    if backfilled_detection:
+      color = (255, 100, 100)
+    else:
+      color = (255, 255, 255)
     for bbox in self.bboxes:
       xyxy_box = bbox[0], bbox[1], bbox[0] + bbox[2], bbox[1] + bbox[3]
-      self._detection_image = add_bbox_in_image(self.detection_image, xyxy_box)
+      self._detection_image = add_bbox_in_image(
+        self.detection_image, xyxy_box, color=color)
 
   def draw_pose_estimation(self):
     """Draw the result of performing pose estimation."""
@@ -253,8 +270,8 @@ class VideoFrame:
 
 
 if __name__ == '__main__':
-  video_path = './input/bench4.mp4'
-  output_dir = './outputs_bench4/'
+  video_path = './input/squat_2.mp4'
+  output_dir = './outputs_squat2/'
   frame_dir = None
   v = Video(video_path, output_dir)
 

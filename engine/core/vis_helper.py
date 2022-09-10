@@ -61,15 +61,11 @@ def draw_skeleton_in_origin_image(batch_image_list, batch_joints_list, batch_bbo
       save_image(vis_image_save_path, processed_image)
 
 
-def add_bbox_in_image(image, bbox):
+def add_bbox_in_image(image, bbox, color=(255, 255, 255)):
   """
   :param image
   :param bbox   -  xyxy
   """
-
-  #color = (random() * 255, random() * 255, random() * 255)
-  color = (255, 255, 255)
-
   x1, y1, x2, y2 = map(int, bbox)
   image_with_bbox = cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness=6)
   return image_with_bbox
