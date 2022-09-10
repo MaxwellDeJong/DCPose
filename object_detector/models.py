@@ -1,14 +1,9 @@
-
-from __future__ import division
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 import numpy as np
+import torch
+from torch.autograd import Variable
 
-from .parse_config import *
-from .detector_utils import build_targets
+from object_detector import detector_utils
+from object_detector import parse_config
 
 
 def create_modules(module_defs):
@@ -17,9 +12,9 @@ def create_modules(module_defs):
   """
   hyperparams = module_defs.pop(0)
   output_filters = [int(hyperparams["channels"])]
-  module_list = nn.ModuleList()
+  module_list = torch.nn.ModuleList()
   for i, module_def in enumerate(module_defs):
-    modules = nn.Sequential()
+    modules = torch.nn.Sequential()
 
     if module_def["type"] == "convolutional":
       bn = int(module_def["batch_normalize"])
@@ -28,7 +23,7 @@ def create_modules(module_defs):
       pad = (kernel_size - 1) // 2 if int(module_def["pad"]) else 0
       modules.add_module(
         "conv_%d" % i,
-        nn.Conv2d(
+        torch.nn.Conv2d(
           in_channels=output_filters[-1],
           out_channels=filters,
           kernel_size=kernel_size,
@@ -38,17 +33,17 @@ def create_modules(module_defs):
         ),
       )
       if bn:
-        modules.add_module("batch_norm_%d" % i, nn.BatchNorm2d(filters))
+        modules.add_module("batch_norm_%d" % i, torch.nn.BatchNorm2d(filters))
       if module_def["activation"] == "leaky":
-        modules.add_module("leaky_%d" % i, nn.LeakyReLU(0.1))
+        modules.add_module("leaky_%d" % i, torch.nn.LeakyReLU(0.1))
 
     elif module_def["type"] == "maxpool":
       kernel_size = int(module_def["size"])
       stride = int(module_def["stride"])
       if kernel_size == 2 and stride == 1:
-        padding = nn.ZeroPad2d((0, 1, 0, 1))
+        padding = torch.nn.ZeroPad2d((0, 1, 0, 1))
         modules.add_module("_debug_padding_%d" % i, padding)
-      maxpool = nn.MaxPool2d(
+      maxpool = torch.nn.MaxPool2d(
         kernel_size=int(module_def["size"]),
         stride=int(module_def["stride"]),
         padding=int((kernel_size - 1) // 2),
@@ -86,7 +81,7 @@ def create_modules(module_defs):
   return hyperparams, module_list
 
 
-class Upsample(nn.Module):
+class Upsample(torch.nn.Module):
   """ nn.Upsample is deprecated """
 
   def __init__(self, scale_factor, mode="linear"):
@@ -95,18 +90,18 @@ class Upsample(nn.Module):
     self.mode = mode
 
   def forward(self, x):
-    x = F.interpolate(x, scale_factor=self.scale_factor, mode=self.mode)
+    x = torch.nn.functional.interpolate(x, scale_factor=self.scale_factor, mode=self.mode)
     return x
 
 
-class EmptyLayer(nn.Module):
+class EmptyLayer(torch.nn.Module):
   """Placeholder for 'route' and 'shortcut' layers"""
 
   def __init__(self):
     super(EmptyLayer, self).__init__()
 
 
-class YOLOLayer(nn.Module):
+class YOLOLayer(torch.nn.Module):
   """Detection layer"""
 
   def __init__(self, anchors, num_classes, img_dim):
@@ -117,8 +112,8 @@ class YOLOLayer(nn.Module):
     self.bbox_attrs = 5 + num_classes
     self.image_dim = img_dim
     self.ignore_thres = 0.5
-    self.mse_loss = nn.MSELoss()
-    self.bce_loss = nn.BCELoss()
+    self.mse_loss = torch.nn.MSELoss()
+    self.bce_loss = torch.nn.BCELoss()
 
   def forward(self, x, targets=None):
     nA = self.num_anchors
@@ -128,7 +123,6 @@ class YOLOLayer(nn.Module):
 
     # Tensors for cuda support
     FloatTensor = torch.cuda.FloatTensor if x.is_cuda else torch.FloatTensor
-    LongTensor = torch.cuda.LongTensor if x.is_cuda else torch.LongTensor
     ByteTensor = torch.cuda.ByteTensor if x.is_cuda else torch.ByteTensor
 
     prediction = x.view(
@@ -173,7 +167,7 @@ class YOLOLayer(nn.Module):
         self.bce_loss = self.bce_loss.cuda()
 
       (num_targets, num_correct, obj_mask, noobj_mask, tx, ty, tw, th, tconf,
-       tcls) = build_targets(
+       tcls) = detector_utils.build_targets(
         pred_boxes=pred_boxes.data.cpu(),
         pred_conf=pred_conf.data.cpu(),
         pred_cls=pred_cls.data.cpu(),
@@ -232,12 +226,12 @@ class YOLOLayer(nn.Module):
       return (output, loss, inference_metrics)
 
 
-class Darknet(nn.Module):
+class Darknet(torch.nn.Module):
   """YOLOv3 object detection model"""
 
   def __init__(self, config_path, img_size=416):
     super().__init__()
-    self.module_defs = parse_model_config(config_path)
+    self.module_defs = parse_config.parse_model_config(config_path)
     self.hyperparams, self.module_list = create_modules(self.module_defs)
     self.img_size = img_size
     self.seen = 0

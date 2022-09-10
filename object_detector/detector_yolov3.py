@@ -1,16 +1,14 @@
-from .models import *
-from .detector_utils import *
+from object_detector import models
+from object_detector import detector_utils
 
+import PIL
+import argparse
+import numpy as np
 import os
+import torch
+
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
-import argparse
-
-import torch
-from torch.autograd import Variable
-from PIL import Image
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_path",
@@ -23,7 +21,7 @@ parser.add_argument("--weights_path",
                     help="path to weights file")
 parser.add_argument("--conf_thres",
                     type=float,
-                    default=0.4,
+                    default=0.2,
                     help="object confidence threshold")
 parser.add_argument("--nms_thres",
                     type=float,
@@ -60,7 +58,7 @@ def load_eval_model():
   """Load a yolov3 detector model for evaluation."""
   cuda = torch.cuda.is_available()
   # Set up model
-  model = Darknet(opt.config_path, img_size=opt.img_size)
+  model = models.Darknet(opt.config_path, img_size=opt.img_size)
   if opt.weights_path.endswith(".weights"):
     # Load darknet weights
     model.load_darknet_weights(opt.weights_path)
@@ -73,15 +71,17 @@ def load_eval_model():
   return model
 
 
-def inference_yolov3_from_img(img: np.ndarray, model: Darknet):
-  input_img = preprocess_img_for_yolo(img)
+def inference_yolov3_from_img(img: np.ndarray, model: models.Darknet):
+  input_img = detector_utils.preprocess_img_for_yolo(img)
   # Configure input
-  input_img = Variable(input_img.type(_Tensor_Type))
+  input_img = torch.autograd.Variable(input_img.type(_Tensor_Type))
 
   # Get detections
   with torch.no_grad():
     detections = model(input_img)
-    detections = non_max_suppression(detections, opt.conf_thres, opt.nms_thres)[0]
+    detections = detector_utils.non_max_suppression(detections,
+                                                    opt.conf_thres,
+                                                    opt.nms_thres)[0]
     if detections is None:
       return []
     else:
@@ -112,6 +112,6 @@ def inference_yolov3_from_img(img: np.ndarray, model: Darknet):
 
 if __name__ == "__main__":
   img_path = "/export/guanghan/PyTorch-YOLOv3/data/samples/messi.jpg"
-  img = np.array(Image.open(img_path))
+  img = np.array(PIL.Image.open(img_path))
   human_candidates = inference_yolov3_from_img(img)
   print("human_candidates:", human_candidates)

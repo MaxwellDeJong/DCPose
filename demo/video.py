@@ -21,7 +21,6 @@ from object_detector.models import Darknet
 from tools.inference import get_inference_model
 from tools.inference import get_inference_preprocessing_transforms
 from tools.inference import inference_PE
-from utils.common import INFERENCE_PHASE
 
 
 _ZERO_FILL = 8
@@ -62,6 +61,7 @@ class Video:
     assert isOpened, "Can't find video"
     for index in range(video_length):
       (flag, frame_data) = cap.read()
+      frame_data = cv2.transpose(frame_data)
       frame_name = "{}.jpg".format(str(index).zfill(_ZERO_FILL))
       frame_path = os.path.join(image_save_path, frame_name)
       if flag:
@@ -253,8 +253,8 @@ class VideoFrame:
 
 
 if __name__ == '__main__':
-  video_path = './input/test_2p.mp4'
-  output_dir = './outputs_2p/'
+  video_path = './input/bench4.mp4'
+  output_dir = './outputs_bench4/'
   frame_dir = None
   v = Video(video_path, output_dir)
 
