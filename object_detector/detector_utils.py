@@ -1,9 +1,6 @@
-
-from __future__ import division
-import math
-import torch
-import numpy as np
 import cv2
+import numpy as np
+import torch
 
 def preprocess_img_for_yolo(img, img_size=416):
   input_img, _ = pad_to_square(img, 127.5)
@@ -340,8 +337,8 @@ def build_targets(
       tx[b, best_n, gj, gi] = gx - gi
       ty[b, best_n, gj, gi] = gy - gj
       # Width and height
-      tw[b, best_n, gj, gi] = math.log(gw / anchors[best_n][0] + 1e-16)
-      th[b, best_n, gj, gi] = math.log(gh / anchors[best_n][1] + 1e-16)
+      tw[b, best_n, gj, gi] = torch.log(gw / anchors[best_n][0] + 1e-16)
+      th[b, best_n, gj, gi] = torch.log(gh / anchors[best_n][1] + 1e-16)
       # One-hot encoding of label
       target_label = int(target[b, t, 0])
       tcls[b, best_n, gj, gi, target_label] = 1
